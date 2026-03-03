@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Remote Control SE: The Android to Claude RC's iPhone — Rishi Vyas</title>
+  <meta name="description" content="I couldn't get Claude's official remote control working. So I built my own in 175 lines of Node.js.">
+  <meta property="og:title" content="Remote Control SE: The Android to Claude RC's iPhone">
+  <meta property="og:description" content="I couldn't get Claude's official remote control working. So I built my own in 175 lines of Node.js.">
+  <meta property="og:type" content="article">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="/" class="site-title">Rishi Vyas</a>
+    </nav>
+  </header>
+  <main>
+    <a href="/" class="back-link">&larr; All posts</a>
+
+    <article>
+      <div class="post-header">
+        <h1>Remote Control SE: The Android to Claude RC's iPhone</h1>
+        <p class="post-meta">March 2, 2026</p>
+      </div>
+
+      <div class="post-content">
+        <p>Anthropic built Claude Remote Control — a polished, first-party way to run Claude Code headlessly from anywhere. It's great. It's also locked behind the Max plan at <strong>$200/month</strong>.</p>
+
+        <p>I'm on Pro. I wanted the same thing. So I built my own.</p>
+
+        <p>Think of it like smartphones: Claude RC is the iPhone — sleek, integrated, premium-priced. Remote Control SE is the Android — open, scrappy, runs on anything. Same core job, fraction of the cost.</p>
+
+        <p>It's 175 lines of Node.js. Here's the story of how a failed configuration attempt turned into a tool — and a mild existential crisis about pricing tiers.</p>
+
+        <h2>It Started With Frustration (And Too Much Chai)</h2>
+
+        <p>I wanted to ship code from my phone. Small stuff — copy changes, CSS fixes, quick features. The kind of work that takes 2 minutes to code but 10 minutes to context-switch into: open laptop, find terminal, remember what branch you're on, lose 30 minutes to "just one more thing."</p>
+
+        <p>Anthropic had just launched remote/headless mode for Claude Code, and I thought: perfect, that's exactly what I need.</p>
+
+        <p>So I sat down to configure it. Read the docs. Tried different setups. Hit walls. Then I realized — this feature requires a Max subscription. I'm on Pro. I'd spent an evening reading docs for something I couldn't even use.</p>
+
+        <p>Classic developer moment. The docs didn't reject me — they just let me keep trying until I figured it out myself. Very polite. Very frustrating.</p>
+
+        <h2>Then I Looked at What I Already Had</h2>
+
+        <p>Claude Code has a CLI. It accepts prompts with <code>-p</code>. Telegram has a bot API. My MacBook was sitting right there, doing nothing useful.</p>
+
+        <p>The whole problem was just: <strong>get a message from my phone to a shell command, and send the output back</strong>.</p>
+
+        <p>That's not a product. That's plumbing. And I've been doing plumbing for 20 years — started as a Mainframe dev, shipped COBOL before most of HN was born. A Telegram bot wasn't going to stop me.</p>
+
+        <h2>Three Hours Later</h2>
+
+        <p>One file. One flow:</p>
+
+<pre><code>Phone (Telegram)
+  ↓
+Telegram Bot API (long polling)
+  ↓
+Node.js bridge — 175 lines
+  ├── Allowlist check
+  ├── Input sanitization
+  └── spawn('claude', ['-p', prompt])
+        ↓
+      Project working directory
+        ↓
+      stdout captured → chunked → sent back to Telegram</code></pre>
+
+        <p>No database. No queue. No Docker. No cloud. It runs on my MacBook with <code>npm start</code>. The most complex piece of infrastructure involved is my Wi-Fi router.</p>
+
+        <h2>The Interesting Bits</h2>
+
+        <p><strong>It uses the CLI, not the API.</strong> This is the key insight that saved me weeks of work. The Claude Code CLI gives you the full agent for free — file reading, multi-file editing, git integration, project context awareness. If I'd called the API directly, I would've had to reimplement all of that. The CLI does it all and I just capture the output. Sometimes the laziest solution is the smartest one.</p>
+
+<pre><code>const proc = spawn(bin, [...baseArgs, sanitize(prompt)], {
+  cwd: WORKING_DIR,
+  stdio: ['ignore', 'pipe', 'pipe'],
+});</code></pre>
+
+        <p><strong>Security is simple but real.</strong> Input gets sanitized (strips <code>$()</code>, backticks, <code>&&</code>, pipes, redirects). Process spawning uses <code>spawn()</code> with argument arrays — no shell interpretation. And only my Telegram user ID is allowlisted. Not production-grade, but solid for a personal tool. If someone hacks my Telegram bot, they deserve whatever's in my working directory.</p>
+
+        <p><strong>It already supports multiple AI drivers.</strong> The bot can route to either Claude Code or Aider. Switching is one environment variable:</p>
+
+<pre><code>AI_DRIVER=claude   # or "aider"</code></pre>
+
+        <p>Aider runs with <code>--no-auto-commits</code> so you stay in control. This is where it gets interesting for the roadmap — but more on that later.</p>
+
+        <h2>What It Looks Like</h2>
+
+        <p>Here's me adding a typing animation to a website from my phone, sitting in a cafe:</p>
+
+        <img src="../images/telegram-screenshot.png" alt="Telegram chat showing a message to add a typing animation, followed by Claude Code's detailed response confirming the change was made, committed, and pushed">
+
+        <p>I typed: <em>"a typing effect on the hero headline that writes out 'Build Smarter with AI' letter by letter when the page loads. commit and push"</em></p>
+
+        <p>A minute later — CSS animations, character-by-character JS, reduced motion support, committed and pushed. The change was live before I finished my coffee. The barista was more impressed than my manager would have been.</p>
+
+        <h2>iPhone vs Android</h2>
+
+        <p>Here's the honest comparison:</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Claude RC (iPhone)</th>
+              <th>Remote Control SE (Android)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Plan required</strong></td><td>Max ($200/mo)</td><td>Pro ($20/mo)</td></tr>
+            <tr><td><strong>Setup</strong></td><td>Anthropic's config</td><td>5-minute DIY</td></tr>
+            <tr><td><strong>AI drivers</strong></td><td>Claude only</td><td>Claude, Aider, any CLI tool</td></tr>
+            <tr><td><strong>Infrastructure</strong></td><td>Anthropic's cloud</td><td>Your machine</td></tr>
+            <tr><td><strong>Open source</strong></td><td>No</td><td>Yes</td></tr>
+            <tr><td><strong>Extensible</strong></td><td>No</td><td>Add any driver you want</td></tr>
+            <tr><td><strong>Polish</strong></td><td>High</td><td>"It works"</td></tr>
+          </tbody>
+        </table>
+
+        <p>Let me be honest: Claude RC is the better product. No question. It's what you'd use if you're a team, if you need reliability guarantees, if you're running a business on it.</p>
+
+        <p>But Remote Control SE is what you use when you're a developer on a Saturday night who just wants to fix a damn CSS bug from your couch without opening a laptop. And because it's driver-agnostic, it's not locked to any single AI vendor. Today it supports Claude Code and Aider. Tomorrow it could support Cursor's CLI, Codex, or whatever ships next.</p>
+
+        <p>That's the Android advantage — it's open.</p>
+
+        <h2>The Stack</h2>
+
+        <table>
+          <thead>
+            <tr><th>Component</th><th>Choice</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Runtime</td><td>Node.js 18+</td></tr>
+            <tr><td>Bot framework</td><td>grammY</td></tr>
+            <tr><td>AI drivers</td><td>Claude Code CLI, Aider</td></tr>
+            <tr><td>Lines of code</td><td>175</td></tr>
+            <tr><td>Dependencies</td><td>2 (grammy, dotenv)</td></tr>
+            <tr><td>Database</td><td>None</td></tr>
+            <tr><td>Deployment</td><td>My laptop</td></tr>
+            <tr><td>Complexity</td><td>Less than my morning coffee order</td></tr>
+          </tbody>
+        </table>
+
+        <h2>What's Next</h2>
+
+        <p>If there's interest, I want to build a hosted version:</p>
+
+        <ul>
+          <li><strong>Multi-project support</strong> — switch between repos with a command</li>
+          <li><strong>More AI drivers</strong> — Cursor, Codex, Windsurf, whatever has a CLI</li>
+          <li><strong>Conversation history</strong> — so follow-up messages have context</li>
+          <li><strong>Cloud deployment</strong> — so it doesn't depend on your laptop being open</li>
+          <li><strong>WhatsApp support</strong> — Telegram works great, but WhatsApp has broader reach</li>
+        </ul>
+
+        <p>The vision: <strong>a universal remote control for AI coding assistants</strong>. The Android of AI dev tools — open, extensible, works with everything. You shouldn't need a $200/month plan or a laptop open to ship a quick fix.</p>
+
+        <p>And if Anthropic eventually makes remote control available on Pro? Great. I'll still have a tool that works with every AI coding assistant, not just one.</p>
+
+        <h2>Try It</h2>
+
+        <p>If you want to set it up yourself, it takes about 5 minutes:</p>
+
+        <ol>
+          <li>Create a Telegram bot via <a href="https://t.me/BotFather">@BotFather</a></li>
+          <li>Get your Telegram user ID</li>
+          <li>Clone the repo, configure <code>.env</code>:</li>
+        </ol>
+
+<pre><code>TELEGRAM_BOT_TOKEN=your_token
+AUTHORIZED_TELEGRAM_IDS=your_id
+WORKING_DIR=/path/to/your/project
+AI_DRIVER=claude</code></pre>
+
+        <ol start="4">
+          <li><code>npm install && npm start</code></li>
+        </ol>
+
+        <p>Start texting your bot. Ship code from your phone. Tell your laptop it can rest.</p>
+
+        <p><a href="#">GitHub repo →</a></p>
+
+        <hr>
+
+        <p class="author-bio">I'm <a href="https://www.linkedin.com/in/rishi-vyas-b788802b/">Rishi Vyas</a> — Engineering Lead at Scotiabank by day, AI tinkerer by night. 20+ years in tech, started as a Mainframe/COBOL dev (yes, that old), worked across HSBC, Barclays, CIBC, and Scotiabank. I build AI agents on weekends through <a href="https://localtechedge.com">Local Tech Edge</a> — previously built <a href="https://x.com">Chotu</a>, an AI agent that scans Twitter and Reddit to reply with actually helpful advice (he never complains and works 24/7, like a good intern). If you want a hosted version of Remote Control SE, or just want to argue about whether this is the future of dev tooling, find me on <a href="https://www.linkedin.com/in/rishi-vyas-b788802b/">LinkedIn</a> or <a href="https://x.com">Twitter</a>.</p>
+      </div>
+    </article>
+  </main>
+  <footer>
+    <p>
+      <a href="https://www.linkedin.com/in/rishi-vyas-b788802b/">LinkedIn</a> ·
+      <a href="https://github.com/reshevyas-png">GitHub</a>
+    </p>
+  </footer>
+</body>
+</html>
